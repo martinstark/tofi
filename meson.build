@@ -104,6 +104,7 @@ common_sources = files(
   'src/entry.c',
   'src/entry_backend/pango.c',
   'src/entry_backend/harfbuzz.c',
+  'src/events.c',
   'src/matching.c',
   'src/history.c',
   'src/input.c',

@@ -729,6 +729,11 @@ bool parse_option(struct tofi *tofi, const char *filename, size_t lineno, const 
 		if (!err) {
 			tofi->physical_keybindings = val;
 		}
+	} else if (strcasecmp(option, "stream-events") == 0) {
+		bool val = parse_bool(filename, lineno, value, &err);
+		if (!err) {
+			tofi->stream_events = val;
+		}
 	} else if (strcasecmp(option, "drun-launch") == 0) {
 		bool val = parse_bool(filename, lineno, value, &err);
 		if (!err) {
