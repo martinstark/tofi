@@ -18,6 +18,7 @@
 #include "drun.h"
 #include "config.h"
 #include "entry.h"
+#include "events.h"
 #include "input.h"
 #include "log.h"
 #include "nelem.h"
@@ -918,6 +919,7 @@ const struct option long_options[] = {
 	{"hide-input", required_argument, NULL, 0},
 	{"hidden-character", required_argument, NULL, 0},
 	{"physical-keybindings", required_argument, NULL, 0},
+	{"stream-events", optional_argument, NULL, 's'},
 	{"drun-launch", required_argument, NULL, 0},
 	{"drun-print-exec", required_argument, NULL, 0},
 	{"terminal", required_argument, NULL, 0},
@@ -989,6 +991,17 @@ static void parse_args(struct tofi *tofi, int argc, char *argv[])
 			} else {
 				tofi->late_keyboard_init = true;
 			}
+		} else if (opt == 's') {
+			/*
+			 * Handle --stream-events with optional argument.
+			 */
+			if (optarg) {
+				if (!config_apply(tofi, long_options[option_index].name, optarg)) {
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				tofi->stream_events = true;
+			}
 		}
 		opt = getopt_long(argc, argv, short_options, long_options, &option_index);
 	}
@@ -1005,6 +1018,8 @@ static bool do_submit(struct tofi *tofi)
 	struct entry *entry = &tofi->window.entry;
 	uint32_t selection = entry->selection + entry->first_result;
 	char *res = entry->results.buf[selection].string;
+
+	event_submit(tofi, selection, res);
 
 	if (tofi->window.entry.results.count == 0) {
 		/* Always require a match in drun mode. */
@@ -1743,6 +1758,14 @@ int main(int argc, char *argv[])
 		free(tofi.xkb_keymap_string);
 		tofi.late_keyboard_init = false;
 		log_debug("Keyboard configured.\n");
+	}
+
+	/* Emit open event for stream consumers. */
+	event_open(&tofi);
+
+	/* Emit initial select event if there are results. */
+	if (tofi.window.entry.results.count > 0) {
+		event_select(&tofi, 0, tofi.window.entry.results.buf[0].string);
 	}
 
 	/*

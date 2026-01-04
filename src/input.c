@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
 #include <unistd.h>
+#include "events.h"
 #include "input.h"
 #include "log.h"
 #include "nelem.h"
@@ -93,6 +94,7 @@ void input_handle_keypress(struct tofi *tofi, xkb_keycode_t keycode)
 		select_next_page(tofi);
 	} else if (key == KEY_ESC
 			|| ((key == KEY_C || key == KEY_LEFTBRACE || key == KEY_G) && ctrl)) {
+		event_close(tofi, "escape");
 		tofi->closed = true;
 		return;
 	} else if (key == KEY_ENTER
@@ -242,6 +244,7 @@ void input_refresh_results(struct tofi *tofi)
 	}
 
 	reset_selection(tofi);
+	event_input(tofi, entry->input_utf8, entry->results.count);
 }
 
 void delete_character(struct tofi *tofi)
@@ -332,12 +335,22 @@ void paste(struct tofi *tofi)
 	tofi->clipboard.fd = fildes[0];
 }
 
+static void emit_selection_event(struct tofi *tofi)
+{
+	struct entry *entry = &tofi->window.entry;
+	uint32_t idx = entry->selection + entry->first_result;
+	if (idx < entry->results.count) {
+		event_select(tofi, idx, entry->results.buf[idx].string);
+	}
+}
+
 void select_previous_result(struct tofi *tofi)
 {
 	struct entry *entry = &tofi->window.entry;
 
 	if (entry->selection > 0) {
 		entry->selection--;
+		emit_selection_event(tofi);
 		return;
 	}
 
@@ -350,6 +363,7 @@ void select_previous_result(struct tofi *tofi)
 		entry->selection = entry->first_result - 1;
 		entry->first_result = 0;
 	}
+	emit_selection_event(tofi);
 }
 
 void select_next_result(struct tofi *tofi)
@@ -369,6 +383,7 @@ void select_next_result(struct tofi *tofi)
 		}
 		entry->last_num_results_drawn = entry->num_results_drawn;
 	}
+	emit_selection_event(tofi);
 }
 
 void previous_cursor_or_result(struct tofi *tofi)
@@ -407,6 +422,7 @@ void select_previous_page(struct tofi *tofi)
 	}
 	entry->selection = 0;
 	entry->last_num_results_drawn = entry->num_results_drawn;
+	emit_selection_event(tofi);
 }
 
 void select_next_page(struct tofi *tofi)
@@ -419,4 +435,5 @@ void select_next_page(struct tofi *tofi)
 	}
 	entry->selection = 0;
 	entry->last_num_results_drawn = entry->num_results_drawn;
+	emit_selection_event(tofi);
 }
