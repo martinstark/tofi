@@ -19,6 +19,7 @@ single frame.
   * [Arch](#arch)
 * [Usage](#usage)
   * [Theming](#theming)
+* [Event Streaming](#event-streaming)
 * [Performance](#performance)
   * [Options](#options)
   * [Benchmarks](#benchmarks)
@@ -144,6 +145,135 @@ tweak them to look correct on your display.
 
 [`themes/soy-milk`](themes/soy-milk)
 ![Soy milk theme screenshot](screenshot_soy_milk.png)
+
+## Event Streaming
+
+Tofi can output a stream of JSON events to stderr, enabling external tools to
+react to user interactions in real-time. This is useful for building wrappers,
+previews, or custom integrations around tofi.
+
+### Enabling Event Streaming
+
+Enable via command line:
+```sh
+tofi --stream-events
+```
+
+Or in your config file:
+```
+stream-events = true
+```
+
+### Event Types
+
+All events are emitted as single-line JSON objects to stderr.
+
+#### `open`
+
+Emitted once when tofi opens and is ready to accept input.
+
+```json
+{
+  "event": "open",
+  "mode": "plain",
+  "items": 42,
+  "window": {"x": 100, "y": 200, "width": 800, "height": 600},
+  "output": {"width": 1920, "height": 1080}
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `mode` | One of `"plain"`, `"run"`, or `"drun"` |
+| `items` | Total number of items available |
+| `window.x`, `window.y` | Calculated window position on screen |
+| `window.width`, `window.height` | Window dimensions |
+| `output.width`, `output.height` | Output (monitor) dimensions |
+
+#### `input`
+
+Emitted when the user types or modifies the input field.
+
+```json
+{"event": "input", "value": "fire", "results": 3}
+```
+
+| Field | Description |
+|-------|-------------|
+| `value` | Current input text |
+| `results` | Number of matching results |
+
+#### `select`
+
+Emitted when the selection changes (arrow keys, page up/down, etc.). Also
+emitted once on open if there are results.
+
+```json
+{"event": "select", "index": 2, "value": "firefox"}
+```
+
+| Field | Description |
+|-------|-------------|
+| `index` | Zero-based index in the filtered result list |
+| `value` | Text of the selected item |
+
+#### `submit`
+
+Emitted when the user confirms their selection (Enter key).
+
+```json
+{"event": "submit", "index": 0, "value": "firefox"}
+```
+
+| Field | Description |
+|-------|-------------|
+| `index` | Zero-based index of the submitted item |
+| `value` | Text of the submitted item |
+
+#### `close`
+
+Emitted when tofi closes without a selection.
+
+```json
+{"event": "close", "reason": "escape"}
+```
+
+| Field | Description |
+|-------|-------------|
+| `reason` | Why tofi closed (currently `"escape"` for user cancellation) |
+
+### Example: Live Preview Script
+
+This example uses `jq` to parse events and display a preview of the selected
+item:
+
+```bash
+#!/bin/bash
+# preview-launcher.sh
+
+tofi-drun --stream-events 2>&1 >/dev/null | while read -r event; do
+    type=$(echo "$event" | jq -r '.event')
+    case "$type" in
+        select)
+            value=$(echo "$event" | jq -r '.value')
+            echo "Preview: $value"
+            # Could trigger a preview window, fetch an icon, etc.
+            ;;
+        submit)
+            value=$(echo "$event" | jq -r '.value')
+            echo "Launching: $value"
+            ;;
+    esac
+done
+```
+
+### Notes
+
+- Events are written to stderr, so stdout remains available for the final
+  selection result.
+- JSON strings are properly escaped (newlines, quotes, backslashes, tabs).
+- The `select` event fires for every navigation action, including page
+  changes.
 
 ## Performance
 
